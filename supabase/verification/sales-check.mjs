@@ -1,0 +1,21 @@
+import {PGlite} from './package/dist/index.js';import {readFile} from 'node:fs/promises';import assert from 'node:assert/strict';import vm from 'node:vm';
+const db=new PGlite();await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated,anon;grant execute on function auth.uid() to authenticated,anon;`);
+for(const file of ['migrations/202611140001_siciliano.sql','roles-policy.sql','sales-details.sql'])await db.exec(await readFile(new URL('../'+file,import.meta.url),'utf8'));
+const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;let count=0;
+await db.exec(`insert into auth.users(id) values('${id(1)}'),('${id(2)}');insert into public.optical_stores(id,name) values('${id(10)}','A'),('${id(20)}','B');insert into public.optical_members(store_id,user_id,role) values('${id(10)}','${id(1)}','team');insert into public.optical_customers(id,store_id,name) values('${id(11)}','${id(10)}','Teste');insert into public.optical_products(id,store_id,name,category,price,stock) values('${id(12)}','${id(10)}','Teste','Armação',100,10);set role authenticated;select set_config('request.jwt.claim.sub','${id(1)}',false);`);
+const q=async s=>(await db.query(s)).rows;
+const create=(n,details,store=10)=>`select public.optical_create_sale_complete('${id(store)}','${id(11)}',current_date,'Pix',false,'[{"product_id":"${id(12)}","quantity":1,"line_total":100}]','${id(n)}','${JSON.stringify(details).replaceAll("'","''")}'::jsonb)`;
+const values={esferico_longe_o_d:-1.25,esferico_longe_o_e:0,cilindrico_perto_o_e:-0.5,eixo_longe_o_d:180,dnp_o_e:31.5,adicao:1.5,valor_armacao:60,valor_lente:40,obs:'Teste',cpf:'12345678901',cep:'01001000',dt_nascimento:'1990-01-01',receita_propia:true};
+await db.exec(create(30,values));count++;let sale=(await q(`select * from public.optical_sales where id='${id(30)}'`))[0];assert.equal(Number(sale.esferico_longe_o_d),-1.25);assert.equal(sale.receita_propia,true);assert.equal(sale.cep,'01001000');assert(sale.created_at);count+=4;
+await db.exec(create(30,{...values,obs:'Não deve substituir'}));assert.equal((await q(`select obs from public.optical_sales where id='${id(30)}'`))[0].obs,'Teste');count++;
+for(const details of [{...values,valor_lente:30},{...values,eixo_longe_o_d:181},{...values,eixo_longe_o_d:1.5},{...values,dnp_o_e:0},{...values,cpf:'123'},{...values,cep:'ABC'},{...values,dt_nascimento:'2999-01-01'},{...values,total:1},{...values,esferico_longe_o_d:'NaN'}]){await assert.rejects(()=>db.exec(create(31,details)));count++;}
+assert.equal((await q('select count(*)::int n from public.optical_sales'))[0].n,1);assert.equal((await q('select stock from public.optical_products'))[0].stock,9);count+=2;
+await db.exec(create(32,{}));count++;
+await assert.rejects(()=>db.exec(create(33,values,20)));count++;
+await db.exec(`select set_config('request.jwt.claim.sub','${id(2)}',false)`);await assert.rejects(()=>db.exec(create(34,values)));count++;
+await db.exec('reset role;set role anon');await assert.rejects(()=>db.exec(create(35,values)));count++;
+const context={window:{},FormData:class{constructor(form){return Object.entries(form)}},Number,Object,String,Math,Date,Error};vm.createContext(context);vm.runInContext(await readFile(new URL('../../dist/sales-fields.js',import.meta.url),'utf8'),context);
+const fields=context.window.SaleFields;const data=fields.read({valor_armacao:'0.10',valor_lente:'0.20',quantity:'1',cpf:'123.456.789-01',cep:'01001-000',eixo_longe_o_d:'90',receita_propia:'false'});assert.equal(data.value,.30);assert.equal(data.details.cpf,'12345678901');assert.equal(data.details.receita_propia,false);assert.equal(data.details.esferico_longe_o_d,null);count+=4;
+assert.throws(()=>fields.read({valor_armacao:'1',valor_lente:'1',cpf:'abc12345678901'}));count++;
+const html=fields.html((k)=>`<input name="${k}">`,(k)=>`<select name="${k}">`,{},'2026-11-16');for(const k of fields.keys)assert(html.includes(`name="${k}"`),k);count++;
+await db.close();console.log(`OK: ${count} verificações de campos, totais, idempotência, rollback de estoque, formatos e permissões.`);

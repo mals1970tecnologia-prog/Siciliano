@@ -1,0 +1,74 @@
+import { PGlite } from './package/dist/index.js';
+import { readFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const db = new PGlite();
+await db.exec(`create role anon; create role authenticated;
+create schema auth; create table auth.users(id uuid primary key);
+create function auth.uid() returns uuid language sql stable as
+$$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+grant usage on schema auth to authenticated,anon;
+grant execute on function auth.uid() to authenticated,anon;`);
+await db.exec(await readFile(new URL('../migrations/202611140001_siciliano.sql',import.meta.url),'utf8'));
+const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
+const q=async sql=>(await db.query(sql)).rows;
+async function login(user,role='authenticated'){await db.exec(`reset role; set role ${role}; select set_config('request.jwt.claim.sub','${user?id(user):''}',false);`)}
+let checks=0;
+async function denied(sql){await assert.rejects(()=>db.exec(sql));checks++}
+await db.exec(`insert into auth.users values('${id(1)}'),('${id(2)}'),('${id(3)}'),('${id(4)}'),('${id(5)}');
+insert into public.optical_stores(id,name) values('${id(10)}','Loja A'),('${id(20)}','Loja B');
+insert into public.optical_members(store_id,user_id,role) values
+('${id(10)}','${id(1)}','admin'),('${id(10)}','${id(2)}','seller'),
+('${id(10)}','${id(3)}','finance'),('${id(20)}','${id(4)}','admin');
+insert into public.optical_customers(id,store_id,name) values('${id(11)}','${id(10)}','Cliente A'),('${id(21)}','${id(20)}','Cliente B');
+insert into public.optical_products(id,store_id,name,category,price,stock) values
+('${id(12)}','${id(10)}','Armação A','Armação',100,10),('${id(22)}','${id(20)}','Lente B','Lente',200,5);`);
+await login(null,'anon');
+await denied('select * from public.optical_customers');
+await denied(`select public.optical_adjust_stock('${id(10)}','${id(12)}',1,'Teste')`);
+await login(5);
+assert.equal((await q('select * from public.optical_customers')).length,0); checks++;
+await denied(`insert into public.optical_customers(store_id,name) values('${id(10)}','Intruso')`);
+await denied(`insert into public.optical_members(store_id,user_id,role) values('${id(10)}','${id(5)}','admin')`);
+await login(2);
+assert.equal((await q('select * from public.optical_customers')).length,1);checks++;
+assert.equal((await q(`select * from public.optical_products where store_id='${id(20)}'`)).length,0);checks++;
+await denied(`insert into public.optical_customers(store_id,name) values('${id(20)}','Outra loja')`);
+await db.exec(`insert into public.optical_customers(store_id,name) values('${id(10)}','Novo cliente')`);checks++;
+await denied(`update public.optical_products set stock=999 where id='${id(12)}'`);
+await denied(`select public.optical_adjust_stock('${id(10)}','${id(12)}',1,'Teste')`);
+await denied(`insert into public.optical_financial_entries(store_id,description,type,value) values('${id(10)}','Teste','Entrada',1)`);
+const sale=(customer,product,qty,request=30)=>`select public.optical_create_sale('${id(10)}','${id(customer)}',current_date,'Pix',false,'[{"product_id":"${id(product)}","quantity":${qty},"line_total":100}]','${id(request)}')`;
+await denied(sale(21,12,1));
+await denied(sale(11,22,1));
+await denied(sale(11,12,11));
+await db.exec(sale(11,12,2));checks++;
+await db.exec(sale(11,12,2));checks++;
+assert.equal(Number((await q(`select stock from public.optical_products where id='${id(12)}'`))[0].stock),8);checks++;
+assert.equal((await q('select * from public.optical_sales')).length,1);checks++;
+assert.equal((await q('select * from public.optical_stock_movements')).length,1);checks++;
+await denied(`select public.optical_receive_sale('${id(10)}','${id(30)}')`);
+await login(3);
+await db.exec(`select public.optical_receive_sale('${id(10)}','${id(30)}')`);checks++;
+assert.equal((await q('select status from public.optical_sales'))[0].status,'Pago');checks++;
+await db.exec(`insert into public.optical_financial_entries(store_id,description,type,value) values('${id(10)}','Aluguel','Saída',500)`);checks++;
+await denied(`insert into public.optical_customers(store_id,name) values('${id(10)}','Financeiro')`);
+await denied(sale(11,12,1,31));
+await login(1);
+await db.exec(`select public.optical_adjust_stock('${id(10)}','${id(12)}',3,'Reposição')`);checks++;
+await denied(`select public.optical_adjust_stock('${id(10)}','${id(12)}',-99,'Inválido')`);
+assert.equal(Number((await q(`select stock from public.optical_products where id='${id(12)}'`))[0].stock),11);checks++;
+await denied(`delete from public.optical_customers where id='${id(11)}'`);
+await denied(`update public.optical_sales set total=1 where id='${id(30)}'`);
+await denied(`delete from public.optical_stock_movements`);
+await denied(`update public.optical_members set role='admin' where user_id='${id(2)}'`);
+await login(4);
+assert.equal((await q('select * from public.optical_sales')).length,0);checks++;
+await denied(`select public.optical_receive_sale('${id(10)}','${id(30)}')`);
+await db.exec('reset role');
+await denied(`insert into public.optical_sales(store_id,customer_id,payment_method,total,created_by) values('${id(10)}','${id(21)}','Pix',1,'${id(1)}')`);
+await db.exec(`update public.optical_members set active=false where user_id='${id(2)}'`);
+await login(2);
+assert.equal((await q('select * from public.optical_customers')).length,0);checks++;
+await denied(sale(11,12,1,32));
+console.log(`OK: migração executada em PostgreSQL local (PGlite); ${checks} verificações de acesso, relacionamentos, transação, estoque e idempotência.`);
+await db.close();

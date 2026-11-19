@@ -1,0 +1,28 @@
+import {PGlite} from './package/dist/index.js';import {readFile} from 'node:fs/promises';import assert from 'node:assert/strict';import {createHandler} from '../functions/optical-register-user/handler.mjs';
+const db=new PGlite();await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,raw_user_meta_data jsonb);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated,anon;grant execute on function auth.uid() to authenticated,anon;`);
+for(const file of ['migrations/202611140001_siciliano.sql','roles-policy.sql','user-registration.sql'])await db.exec(await readFile(new URL('../'+file,import.meta.url),'utf8'));
+const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
+await db.exec(`insert into auth.users(id,email,email_confirmed_at) values ${[1,2,3,4].map(n=>`('${id(n)}','user${n}@test.com',now())`).join(',')};insert into public.optical_stores(id,name) values('${id(10)}','Teste');insert into public.optical_members(store_id,user_id,role,full_name) values('${id(10)}','${id(1)}','admin','Administrador'),('${id(10)}','${id(2)}','manager','Gerente'),('${id(10)}','${id(3)}','team','Equipe');`);
+async function login(n,role='authenticated'){await db.exec(`reset role;set role ${role};select set_config('request.jwt.claim.sub','${n?id(n):''}',false)`)}
+const set=(n,role,name)=>`select public.optical_set_member('${id(10)}','user${n}@test.com','${role}',true,'${name}')`;
+let count=0;await login(2);await assert.rejects(()=>db.exec(set(4,'manager','Novo Gerente')));count++;
+await assert.rejects(()=>db.exec(set(1,'team','Administrador')));count++;
+await assert.rejects(()=>db.exec(set(2,'team','Gerente')));count++;
+await assert.rejects(()=>db.exec(set(4,'team','')));count++;
+await db.exec(set(4,'team','  Nome   Completo  '));assert.equal((await db.query('select full_name from public.optical_list_members(\''+id(10)+'\') where user_id=\''+id(4)+'\'')).rows[0].full_name,'Nome Completo');count++;
+await login(3);await assert.rejects(()=>db.exec(set(4,'team','Outro Nome')));count++;
+await login(1);await db.exec(set(4,'manager','Novo Gerente'));count++;
+await login(null,'anon');await assert.rejects(()=>db.exec(`select * from public.optical_list_members('${id(10)}')`));count++;await db.close();
+let actor='manager',rpcOK=true,calls=[];
+const handler=createHandler({env:key=>key==='SUPABASE_URL'?'https://test.invalid':'server-test-only',fetch:async(url,opts={})=>{calls.push({url,opts});if(url.endsWith('/auth/v1/user'))return Response.json({id:id(2)});if(url.includes('/optical_members?'))return Response.json([{role:actor}]);if(url.endsWith('/auth/v1/admin/users'))return Response.json({id:id(4)});if(url.endsWith('/rpc/optical_set_member'))return rpcOK?Response.json(id(4)):Response.json({error:'Denied'},{status:403});throw Error('Unexpected request');}});
+const payload={store_id:id(10),full_name:'Nome Completo',email:'new@test.com',password:'test-'+crypto.randomUUID(),role:'team',active:true};
+const req=(body=payload,token=true)=>new Request('https://function.test',{method:'POST',headers:{Origin:'https://siciliano.malstec.com.br',...(token?{Authorization:'Bearer caller-session'}:{}),'Content-Type':'application/json'},body:JSON.stringify(body)});
+assert.equal((await handler(req(payload,false))).status,401);count++;
+actor='team';assert.equal((await handler(req())).status,403);count++;
+actor='manager';assert.equal((await handler(req({...payload,role:'admin'}))).status,403);count++;
+assert.equal((await handler(req({...payload,role:'manager'}))).status,403);count++;
+assert.equal((await handler(req({...payload,password:'short'}))).status,400);count++;
+calls=[];const success=await handler(req());assert.equal(success.status,201);assert(!JSON.stringify(await success.json()).includes(payload.password));count+=2;
+const rpc=calls.find(c=>c.url.endsWith('/rpc/optical_set_member'));assert.equal(rpc.opts.headers.Authorization,'Bearer caller-session');assert.equal(JSON.parse(rpc.opts.body).p_full_name,'Nome Completo');count+=2;
+rpcOK=false;calls=[];assert.equal((await handler(req())).status,409);assert(!calls.some(c=>c.opts.method==='DELETE'));count+=2;
+console.log(`OK: ${count} verificações de nome obrigatório, hierarquia, cadastro, JWT, senha e tratamento de falhas.`);

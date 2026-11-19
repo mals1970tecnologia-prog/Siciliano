@@ -1,0 +1,45 @@
+const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict');
+const context=vm.createContext({Intl,Date,Map,Number,String,Math});
+vm.runInContext(fs.readFileSync('dist/dashboard.js','utf8')+';globalThis.build=DashboardData.build;',context);
+const clients=['a','b','c','leap'].map(id=>({id,name:id,phone:'(11) 99999-9999'}));
+const sale=(id,client,date,value,created_at='')=>({id,client,date,value,created_at});
+const sales=[sale('old','a','2024-11-01',100),sale('repeat','a','2025-11-01',200),sale('first','b','2025-11-17',0.1),sale('second','b','2026-11-16',0.2,'2026-11-17'),sale('newer','c','2026-11-17',50,'2020-01-01'),sale('outside','c','2026-11-10',99),sale('leap','leap','2024-02-29',80)];
+const d=context.build({clients,sales},'2026-11-17');
+assert.equal(d.clientCount,4);assert.equal(d.days.length,7);assert.equal(d.days[0].date,'2026-11-11');assert.equal(d.days[6].date,'2026-11-17');
+assert.equal(d.days[0].count,0);assert.equal(d.days[5].cents,20);assert.equal(d.days[6].cents,5000);
+assert.equal(d.thisYear.count,3);assert.equal(d.thisYear.cents,14920);
+assert.equal(d.years.find(x=>x.year==='2025').cents,20010);
+assert.equal(d.anniversaries.length,1);assert.equal(d.anniversaries[0].client.id,'a');assert.equal(d.anniversaries[0].state,'Já completou');
+assert.equal(d.latest[0].id,'newer'); // Sale date wins over import/creation date.
+const leap=context.build({clients,sales},'2025-02-28');assert.equal(leap.anniversaries[0].anniversary,'2025-02-28');
+const past=context.build({clients,sales},'2026-12-01','2026-11');assert.equal(past.anniversaries[0].state,'Já completou');
+const future=context.build({clients,sales},'2026-10-01','2026-11');assert.equal(future.anniversaries[0].state,'A completar');
+const empty=context.build({clients:[],sales:[]},'2026-01-01');assert.equal(empty.total,0);assert.equal(empty.anniversaries.length,0);assert.equal(empty.days[0].date,'2025-12-26');
+console.log('OK: totais anuais, centavos, 7 dias, última compra, ano bissexto, mês selecionado e ordenação histórica.');
+vm.runInContext('globalThis.whatsappLink=DashboardData.whatsappLink;',context);
+const link=context.whatsappLink({name:'José da Silva',phone:'(11) 91499-0547'},'2026-11-20','2026-11-17');
+const url=new URL(link);assert.equal(url.origin,'https://wa.me');assert.equal(url.pathname,'/5511914990547');
+const message=url.searchParams.get('text');assert.ok(message.startsWith('Olá, José!'));assert.ok(message.includes('20/11/2026'));assert.ok(message.endsWith('💙💚'));assert.ok(!message.includes('TESTE'));
+assert.equal(context.whatsappLink({name:'José',phone:'+55 11 91499-0547'},'2026-11-20','2026-11-17'),link);
+assert.equal(context.whatsappLink({name:'José',phone:'00000000000'},'2026-11-20'),null);
+assert.equal(context.whatsappLink({name:'José',phone:'914990547'},'2026-11-20'),null);
+assert.equal(context.whatsappLink({name:'José',phone:''},'2026-11-20'),null);
+assert.ok(new URL(context.whatsappLink({name:'José',phone:'11914990547'},'2026-11-01','2026-11-17')).searchParams.get('text').includes('completou um ano'));
+console.log('OK: número internacional, personalização, acentos, emojis, data e rejeição de telefone inválido. Nenhuma mensagem enviada.');
+
+assert.equal(d.anniversaries[0].lastPurchase,'2025-11-01');
+const next=context.build({clients,sales},'2027-11-16');
+assert.equal(next.anniversaries.find(x=>x.client.id==='b').state,'Hoje');
+assert.equal(next.anniversaries.find(x=>x.client.id==='b').lastPurchase,'2026-11-16');
+assert.equal(next.anniversaries.find(x=>x.client.id==='c').lastPurchase,'2026-11-17');
+const reordered=context.build({clients,sales:sales.slice().reverse()},'2026-11-17');
+assert.equal(reordered.anniversaries[0].lastPurchase,'2025-11-01');
+const renewed=context.build({clients,sales:[...sales,sale('return','a','2026-11-18',20)]},'2026-11-18');
+assert.equal(renewed.anniversaries.length,0);
+assert.ok(message.includes('última compra'));
+console.log('OK: nova compra reinicia prazo, última data independe da ordem e WhatsApp usa a regra atualizada.');
+
+const twoYearLink=context.whatsappLink({name:'José',phone:'11914990547'},'2026-11-19','2026-11-19',2);
+assert.ok(new URL(twoYearLink).searchParams.get('text').includes('completa dois anos'));
+assert.ok(new URL(context.whatsappLink({name:'José',phone:'11914990547'},'2026-11-18','2026-11-19',2)).searchParams.get('text').includes('completou dois anos'));
+console.log('OK: mensagem de reativação com dois anos, mantendo o padrão de um ano do painel.');
