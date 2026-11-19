@@ -1,4 +1,5 @@
 export function createCloud(client) {
+  const uppercase = value => String(value ?? '').trim().toLocaleUpperCase('pt-BR');
   const tables = {clients:'optical_customers', products:'optical_products', entries:'optical_financial_entries'};
   let store, role, user;
   const checked = async request => { const result = await request; if (result.error) throw result.error; return result.data; };
@@ -41,8 +42,8 @@ export function createCloud(client) {
         p_store:store.id,p_customer:data.client,p_date:data.date,p_payment:data.payment,p_paid:data.status==='Pago',
         p_items:[{product_id:data.product,quantity:data.quantity,line_total:data.value}],p_request_id:requestId,
         ...(data.details?{p_details:data.details}:{})}));
-      const payload=kind==='clients'?{name:data.name,phone:data.phone,email:data.email}:
-        kind==='products'?{name:data.name,material:data.material||'',category:data.category,price:data.price}:
+      const payload=kind==='clients'?{name:uppercase(data.name),phone:data.phone,email:data.email}:
+        kind==='products'?{name:uppercase(data.name),material:uppercase(data.material),category:data.category,price:data.price}:
         {description:data.description,type:data.type,value:data.value,entry_date:data.date};
       const request=id?client.from(tables[kind]).update(payload).eq('store_id',store.id).eq('id',id):
         client.from(tables[kind]).insert({...payload,store_id:store.id});

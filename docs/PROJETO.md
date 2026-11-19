@@ -396,3 +396,10 @@ O relatório Clientes para reativar passa a incluir clientes com dois anos de ca
 Em Clientes para reativar, o indicador Vendas históricas oferece Detalhar valor histórico. A seleção usa os clientes elegíveis (dois anos ou mais sem comprar), a pesquisa e a data de referência atuais. O painel mostra o valor total, quantidade de clientes únicos, número de vendas, produtos distintos, intervalo da primeira à última venda, valores por mês, participação por cliente, ranking por unidades e valor por produto e todas as transações que formam o total. Destaca os líderes em unidades e valor, incluindo empates. Valores incluem vendas pagas e pendentes; não representam apenas recebimentos nem uma previsão de faturamento recuperável.
 
 O botão Exportar histórico completo baixa uma linha por venda de todo esse histórico, com código, cliente, data, produto(s), quantidade, valor total, situação e pagamento. O total é somado por venda, sem duplicação por itens. Há impressão/PDF quando o painel está aberto. Testes reconciliam valores por cliente, mês e produto e o total do indicador, além de consulta histórica, pesquisa, exclusão de compras posteriores e CSV.
+
+
+### Cadastros em caixa alta — 19/11/2026
+
+Nomes de clientes, nomes de produtos e material/variante são convertidos para caixa alta com suporte a acentos pt-BR. A conversão acontece durante a digitação/colagem e novamente antes da gravação no adaptador, cobrindo novos cadastros e edições. O cadastro de cliente dentro da venda segue a mesma regra e mantém a seleção local com o nome em caixa alta. E-mail, telefone, números, preços, senhas e usuários permanecem com o tratamento anterior. Rótulos das categorias na seleção aparecem em caixa alta; os valores internos da categoria permanecem no formato previsto pelo banco. Registros antigos são padronizados quando editados; não há alteração em massa dos dados históricos.
+
+Verificações: inserção e edição, acentos, material, preço pendente, preservação dos campos técnicos, posição do cursor e cadastro rápido na venda. As regras de autorização e o esquema do banco não foram alterados.

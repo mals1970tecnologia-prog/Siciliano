@@ -10,6 +10,7 @@ A página de login é pública. Os registros exigem autenticação no Supabase e
 ## Funcionalidades
 
 - Clientes com nome e telefone obrigatórios na interface, pesquisa e exportação.
+- Nomes de clientes/produtos e material salvos em caixa alta, inclusive no cadastro durante a venda.
 - Produtos com material/variante, preço definido ou pendente e estoque.
 - Vendas com receita de longe/perto, valores, CPF, CEP, nascimento e detalhes.
 - Movimentações financeiras, recebimentos e relatórios por período.
