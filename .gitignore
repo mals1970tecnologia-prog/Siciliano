@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.openai/
+imports/
+outputs/
+*.tar.gz
+*.zip
+supabase/verification/package/
+supabase/verification/*.tgz
