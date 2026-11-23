@@ -403,3 +403,10 @@ O botão Exportar histórico completo baixa uma linha por venda de todo esse his
 Nomes de clientes, nomes de produtos e material/variante são convertidos para caixa alta com suporte a acentos pt-BR. A conversão acontece durante a digitação/colagem e novamente antes da gravação no adaptador, cobrindo novos cadastros e edições. O cadastro de cliente dentro da venda segue a mesma regra e mantém a seleção local com o nome em caixa alta. E-mail, telefone, números, preços, senhas e usuários permanecem com o tratamento anterior. Rótulos das categorias na seleção aparecem em caixa alta; os valores internos da categoria permanecem no formato previsto pelo banco. Registros antigos são padronizados quando editados; não há alteração em massa dos dados históricos.
 
 Verificações: inserção e edição, acentos, material, preço pendente, preservação dos campos técnicos, posição do cursor e cadastro rápido na venda. As regras de autorização e o esquema do banco não foram alterados.
+
+
+### Página inicial por perfil — 23/11/2026
+
+Na primeira carga bem-sucedida após login ou restauração de sessão, Administrador e Gerencial iniciam em Visão geral (#inicio) e Equipe em Vendas (#sales), mesmo quando a URL tinha outra página. A escolha ocorre após autorização e carregamento dos dados. A atualização de dados, retorno à aba e salvamentos preservam a navegação válida em andamento. Mudança de perfil volta à página inicial correspondente. Rotas inválidas ou não permitidas também usam a página inicial do perfil, atualizando a URL sem acrescentar histórico. O logo aponta à mesma página inicial. Permissões dos menus mantidas.
+
+Verificação: `node supabase/verification/landing-check.mjs` cobre os três perfis, endereço antigo, rotas inválidas/proibidas, atualização, logo e mudança de perfil. Testes de integração do adaptador também aprovados.
