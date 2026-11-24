@@ -428,3 +428,11 @@ Verificações aprovadas: client-segments-check.cjs, dashboard-check.cjs, contac
 ### Lista de acompanhamento responsiva — 24/11/2026
 
 O acompanhamento de um ano adapta a tabela ao espaço do painel: abaixo de 1100px, cada linha vira um cartão com rótulos, nome em destaque e ações em área própria. Abaixo de 540px, os campos ficam em duas colunas. Telefones e datas permanecem inteiros. A rolagem interna limitada foi removida; em painéis largos a tabela permanece. Cabeçalho flexível, texto e botões maiores. Regras, segmentação, exportação e controle de mensagens preservados. Testes de segmentação e confirmação aprovados; prévia visual com dados fictícios confirmou ações legíveis.
+
+### Retorno do WhatsApp sem nova tela de login — 24/11/2026
+
+O acompanhamento reserva uma nova aba about:blank durante o clique, confere o envio e só então navega essa aba ao WhatsApp, mantendo a aba da ótica. O link informa explicitamente a abertura em nova aba. O navegador decide a apresentação como aba ou janela conforme suas preferências.
+
+Retorno de visibilidade e eventos de autenticação do mesmo usuário verificam usuário e vínculo em segundo plano, sem ocultar a aplicação nem recarregar dados quando o perfil não mudou. Preserva página, filtros e diálogos. Falhas temporárias de rede mostram aviso na aplicação. Sessão ausente, usuário inválido, troca de usuário ou acesso revogado continuam bloqueando o acesso. Persistência de sessão e renovação automática estão explícitas no cliente Supabase. Login inicial e logout mantêm validação.
+
+Testes aprovados: session-return-check.cjs cobre retorno, rede temporária, revogação, saída e troca de usuário; contact-ui-check.cjs confirma nova aba separada sem marcar envio; landing-check.mjs e client-segments-check.cjs sem regressões. Nenhuma mensagem real enviada nos testes.

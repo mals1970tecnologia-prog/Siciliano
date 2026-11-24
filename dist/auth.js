@@ -16,9 +16,12 @@ function lock(text) {
 }
 window.sicilianoLock=lock;
 
-async function validate(session) {
+function temporaryConnectionError(error){return error?.name==='AuthRetryableFetchError'||error?.name==='TypeError'||error?.status===0||error?.status>=500||/failed to fetch|fetch failed|network|timeout/i.test(error?.message||'');}
+function connectionNotice(){window.sicilianoNotice?.('Não foi possível atualizar a conexão. Sua tela foi mantida; tente novamente quando a rede voltar.');}
+async function validate(session, background = false) {
   const version = ++generation;
-  lock('Verificando acesso…');
+  background = background && loaded && !shell.hidden && session?.user?.id === currentUser;
+  if (!background) lock('Verificando acesso…');
   if (!session) {
     if (loaded) { location.reload(); return; }
     message.textContent = 'Informe seu e-mail e senha.';
@@ -28,10 +31,12 @@ async function validate(session) {
   try {
     const { data, error } = await client.auth.getUser();
     if (version !== generation) return;
-    if (error || !data.user || data.user.is_anonymous) throw Error();
+    if (error) throw error;
+    if (!data.user || data.user.is_anonymous) throw Error('Sessão inválida');
     if (loaded && currentUser !== data.user.id) { location.reload(); return; }
     currentUser = data.user.id;
     window.sicilianoCloud ||= createCloud(client);
+    const previousRole=window.sicilianoCloud.role;
     await window.sicilianoCloud.authorize(currentUser);
     if (version !== generation) return;
     if (!loaded) {
@@ -46,12 +51,13 @@ async function validate(session) {
       loaded = true;
     }
     if (version !== generation) return;
-    await window.sicilianoRefresh();
+    if (!background || previousRole !== window.sicilianoCloud.role) await window.sicilianoRefresh();
     if (version !== generation) return;
     screen.hidden = true;
     shell.hidden = false;
   } catch (error) {
     if (version !== generation) return;
+    if (background && temporaryConnectionError(error)) { connectionNotice(); return; }
     lock(error.message?.startsWith('Seu usuário') ? error.message : 'Não foi possível carregar sua loja. Confira o vínculo do usuário, as tabelas e a conexão.');
     submit.disabled = false;
   }
@@ -97,17 +103,17 @@ try {
   if (!config?.url || !config?.publishableKey) throw Error('config');
   if (!config.publishableKey.startsWith('sb_publishable_')) throw Error('config');
   const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.49.8');
-  client = createClient(config.url, config.publishableKey);
+  client = createClient(config.url, config.publishableKey, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   client.auth.onAuthStateChange((_event, session) => {
     // Keep Supabase calls outside the synchronous auth callback.
-    setTimeout(() => validate(session), 0);
+    setTimeout(() => validate(session, true), 0);
   });
   const { data, error } = await client.auth.getSession();
   if (error) throw error;
   await validate(data.session);
   window.addEventListener('hashchange', () => { if (shell.hidden) screen.hidden = false; });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) client.auth.getSession().then(({ data }) => validate(data.session)).catch(() => lock('Conexão indisponível. Tente novamente.'));
+    if (!document.hidden) client.auth.getSession().then(({ data, error }) => {if(error)throw error;return validate(data.session,true);}).catch(error => {if(loaded&&temporaryConnectionError(error))connectionNotice();else lock('Não foi possível verificar a sessão. Recarregue para tentar novamente.');});
   });
 } catch (error) {
   lock(error.message === 'config'
