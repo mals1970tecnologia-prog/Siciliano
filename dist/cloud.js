@@ -6,7 +6,9 @@ export function createCloud(client) {
   async function all(table) {
     let rows=[];
     for(let offset=0;;offset+=500){
-      const batch=await checked(client.from(table).select('*').eq('store_id',store.id).order('id').range(offset,offset+499));
+      let query=client.from(table).select('*').eq('store_id',store.id).order(table==='optical_anniversary_contacts'?'customer_id':'id');
+      if(table==='optical_anniversary_contacts')query=query.order('last_purchase_date');
+      const batch=await checked(query.range(offset,offset+499));
       rows.push(...batch); if(batch.length<500) return rows;
     }
   }
@@ -23,11 +25,12 @@ export function createCloud(client) {
       if(!['admin','manager','team'].includes(role))throw Error('Seu usuário possui um perfil inválido. Solicite a revisão ao administrador.');
     },
     async load(){
-      const [clients,products,sales,items,entries,memberResult]=await Promise.all([
+      const [clients,products,sales,items,entries,memberResult,contactResult]=await Promise.all([
         all('optical_customers'),all('optical_products'),all('optical_sales'),all('optical_sale_items'),
         role==='team'?Promise.resolve([]):all('optical_financial_entries'),
-        role==='team'?Promise.resolve({data:[],error:null}):client.rpc('optical_list_members',{p_store:store.id})]);
-      return {clients,products:products.map(p=>({...p,price:p.price==null?null:Number(p.price)})),
+        role==='team'?Promise.resolve({data:[],error:null}):client.rpc('optical_list_members',{p_store:store.id}),
+        role==='team'?Promise.resolve({data:[],error:null}):all('optical_anniversary_contacts').then(data=>({data,error:null})).catch(error=>({data:[],error}))]);
+      return {clients,contacts:contactResult.data,contactsReady:role!=='team'&&!contactResult.error,contactsError:contactResult.error?.message||'',products:products.map(p=>({...p,price:p.price==null?null:Number(p.price)})),
         sales:sales.sort((a,b)=>a.created_at.localeCompare(b.created_at)).map(s=>{
           const lines=items.filter(i=>i.sale_id===s.id);
           return {...s,client:s.customer_id,product:lines[0]?.product_id,quantity:lines.reduce((n,i)=>n+i.quantity,0),
@@ -57,6 +60,22 @@ export function createCloud(client) {
       if(rows.length!==1)throw Error('Registro não alterado. Confira sua permissão.');
     },
     receive(id){return checked(client.rpc('optical_receive_sale',{p_store:store.id,p_sale:id}));},
+    async contactStatus(customer,lastPurchase){
+      await this.authorize(user);
+      if(!['admin','manager'].includes(role))throw Error('Seu perfil não permite consultar o controle de mensagens.');
+      const rows=await checked(client.from('optical_anniversary_contacts').select('*').eq('store_id',store.id).eq('customer_id',customer).eq('last_purchase_date',lastPurchase));
+      return rows[0]||null;
+    },
+    async markContactSent(customer,lastPurchase){
+      try {
+        const rows=await checked(client.from('optical_anniversary_contacts').insert({store_id:store.id,customer_id:customer,last_purchase_date:lastPurchase}).select('*'));
+        if(rows.length!==1)throw Error('Não foi possível confirmar o registro da mensagem. Atualize os dados.');
+        return rows[0];
+      } catch(error){
+        if(error.code==='23505'){const existing=await this.contactStatus(customer,lastPurchase);if(existing)return existing;}
+        throw error;
+      }
+    },
     adjust(id,delta,reason){return checked(client.rpc('optical_adjust_stock',{p_store:store.id,p_product:id,p_delta:delta,p_reason:reason}));},
     setMember(email,role,active,fullName){return checked(client.rpc('optical_set_member',{p_store:store.id,p_email:email,p_role:role,p_active:active,p_full_name:fullName}));},
     async createUser(data){

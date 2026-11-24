@@ -410,3 +410,11 @@ Verificações: inserção e edição, acentos, material, preço pendente, prese
 Na primeira carga bem-sucedida após login ou restauração de sessão, Administrador e Gerencial iniciam em Visão geral (#inicio) e Equipe em Vendas (#sales), mesmo quando a URL tinha outra página. A escolha ocorre após autorização e carregamento dos dados. A atualização de dados, retorno à aba e salvamentos preservam a navegação válida em andamento. Mudança de perfil volta à página inicial correspondente. Rotas inválidas ou não permitidas também usam a página inicial do perfil, atualizando a URL sem acrescentar histórico. O logo aponta à mesma página inicial. Permissões dos menus mantidas.
 
 Verificação: `node supabase/verification/landing-check.mjs` cobre os três perfis, endereço antigo, rotas inválidas/proibidas, atualização, logo e mudança de perfil. Testes de integração do adaptador também aprovados.
+
+### Controle de mensagens de aniversário — 24/11/2026
+
+Na Visão geral, cada cliente completando um ano da última compra mostra Não enviada ou Enviada. Após enviar manualmente, o usuário confirma em Marcar como enviada; abrir o WhatsApp não registra envio. A confirmação guarda data e responsável no Supabase, compartilhada entre Administrador e Gerencial. Envios anteriores precisam de confirmação manual. Uma confirmação bloqueia nova abertura para a mesma última compra; uma nova compra inicia outro acompanhamento.
+
+Aplicar contact-messages.sql após as migrações de base e perfis. A tabela usa RLS, vínculo com loja e cliente, data da última compra validada e chave única por acompanhamento. O servidor define responsável e horário; não há atualização ou exclusão pelo navegador. Falha ao consultar o controle bloqueia a abertura até atualizar os dados. Antes de abrir, o estado é consultado novamente. Aberturas simultâneas anteriores à confirmação não equivalem a uma reserva de envio.
+
+Verificações: contact-messages-check.mjs (RLS, perfis, isolamento, duplicidade e nova compra), contact-ui-check.cjs (abertura, confirmação, cancelamento e falha segura), cloud-check.mjs e regressões de painel e página inicial aprovadas. Prévia visual usa somente dados fictícios locais.

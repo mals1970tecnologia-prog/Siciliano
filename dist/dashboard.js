@@ -17,8 +17,9 @@ const DashboardData=(()=>{
    const d=byDay.get(s.date);if(d){d.count++;d.cents+=cents;}
    if(!lastPurchase.has(s.client)||s.date>lastPurchase.get(s.client))lastPurchase.set(s.client,s.date);
   }
+  const contacts=new Map((db.contacts||[]).map(c=>[c.customer_id+'|'+c.last_purchase_date,c]));
   const anniversaries=[];
-  for(const [id,date] of lastPurchase){const target=anniversary(date);const client=clients.get(id);if(client&&target.startsWith(month+'-'))anniversaries.push({client,lastPurchase:date,anniversary:target,state:target===today?'Hoje':target<today?'Já completou':'A completar'});}
+  for(const [id,date] of lastPurchase){const target=anniversary(date);const client=clients.get(id);if(client&&target.startsWith(month+'-'))anniversaries.push({client,lastPurchase:date,anniversary:target,contact:contacts.get(id+'|'+date)||null,state:target===today?'Hoje':target<today?'Já completou':'A completar'});}
   anniversaries.sort((a,b)=>a.anniversary.localeCompare(b.anniversary)||a.client.name.localeCompare(b.client.name,'pt-BR'));
   return {clientCount:db.clients.length,years:[...years.values()].sort((a,b)=>b.year.localeCompare(a.year)),days,total:totalCents/100,
    thisYear:years.get(today.slice(0,4))||{count:0,cents:0},anniversaries,
@@ -38,11 +39,37 @@ const DashboardData=(()=>{
  return {build,dateInStore,whatsappLink};
 })();
 let dashboardMonth='';
+function rememberAnniversaryContact(record){
+ db.contacts=(db.contacts||[]).filter(c=>!(c.customer_id===record.customer_id&&c.last_purchase_date===record.last_purchase_date));
+ db.contacts.push(record);
+}
+function bindAnniversaryMessages(){
+ document.querySelectorAll('[data-anniversary-open]').forEach(link=>link.onclick=async event=>{
+  event.preventDefault();if(!db.contactsReady)return toast('Não foi possível verificar o controle de envio. Atualize os dados.');
+  const popup=window.open('','_blank');if(popup)popup.opener=null;
+  try{
+   const existing=await cloud.contactStatus(link.dataset.anniversaryOpen,link.dataset.lastPurchase);
+   if(existing){popup?.close();rememberAnniversaryContact(existing);render();toast('Esta mensagem já foi marcada como enviada. Reenvio bloqueado.');return;}
+   if(!popup){toast('Permita a abertura de janelas para abrir o WhatsApp.');return;}
+   popup.location.href=link.href;
+  }catch(error){popup?.close();db.contactsReady=false;render();toast('Não foi possível conferir o envio. Atualize os dados antes de tentar novamente.');}
+ });
+ document.querySelectorAll('[data-anniversary-sent]').forEach(button=>button.onclick=async()=>{
+  if(!db.contactsReady)return toast('Controle indisponível. Atualize os dados.');
+  const customer=button.dataset.anniversarySent,client=db.clients.find(c=>c.id===customer);
+  if(!confirm(`Você confirma que enviou manualmente a mensagem para ${client?.name||'este cliente'}? A confirmação ficará registrada e bloqueará a abertura pelo acompanhamento desta compra.`))return;
+  button.disabled=true;
+  try{
+   const record=await cloud.markContactSent(customer,button.dataset.lastPurchase);
+   rememberAnniversaryContact(record);render();toast('Mensagem marcada como enviada. Registro salvo na nuvem.');
+  }catch(error){toast('Não foi possível registrar o envio. Atualize os dados antes de tentar novamente.');button.disabled=false;}
+ });
+}
 function dashboardView(){
  const today=DashboardData.dateInStore(),month=dashboardMonth||today.slice(0,7),d=DashboardData.build(db,today,month);
  const max=Math.max(1,...d.days.map(x=>x.cents));
  const annualRows=d.years.map(y=>`<tr><td><b>${y.year}</b></td><td>${y.count.toLocaleString('pt-BR')}</td><td><b>${money(y.cents/100)}</b></td></tr>`);
- const anniversaryRows=d.anniversaries.map(x=>{const link=DashboardData.whatsappLink(x.client,x.anniversary,today);return `<tr><td>${person(x.client.name)}</td><td>${esc(x.client.phone||'Não informado')}</td><td>${fmt(x.lastPurchase)}</td><td>${fmt(x.anniversary)}</td><td><span class="badge ${x.state==='Hoje'?'anniversary-today':''}">${x.state}</span></td><td>${link?`<a class="whatsapp-link" href="${esc(link)}" target="_blank" rel="noopener noreferrer" aria-label="Abrir WhatsApp de ${esc(x.client.name)}">WhatsApp ↗</a>`:'<span class="badge">Telefone inválido</span>'}</td></tr>`;});
+ const anniversaryRows=d.anniversaries.map(x=>{const link=DashboardData.whatsappLink(x.client,x.anniversary,today),ready=db.contactsReady===true;const record=x.contact;const stamp=record?new Date(record.sent_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'';const actor=record?(db.users||[]).find(u=>u.user_id===record.sent_by)?.full_name:'';return `<tr><td>${person(x.client.name)}</td><td>${esc(x.client.phone||'Não informado')}</td><td>${fmt(x.lastPurchase)}</td><td>${fmt(x.anniversary)}</td><td><span class="badge ${x.state==='Hoje'?'anniversary-today':''}">${x.state}</span></td><td>${!ready?'<span class="badge">Controle indisponível</span>':record?`<span class="message-status sent">Enviada</span><small class="message-date">${esc(stamp)}${actor?'<br>'+esc(actor):''}</small>`:'<span class="message-status unsent">Não enviada</span>'}</td><td>${!ready?'<span class="badge">Atualize os dados</span>':record?'<span class="message-locked">Envio já registrado</span>':`${link?`<a class="whatsapp-link" href="${esc(link)}" target="_blank" rel="noopener noreferrer" data-anniversary-open="${esc(x.client.id)}" data-last-purchase="${x.lastPurchase}" aria-label="Abrir WhatsApp de ${esc(x.client.name)}">Abrir WhatsApp</a>`:'<span class="badge">Telefone inválido</span>'}<button type="button" class="text-btn message-confirm" data-anniversary-sent="${esc(x.client.id)}" data-last-purchase="${x.lastPurchase}">Marcar como enviada</button>`}</td></tr>`;});
  const quick=[['clients','♙','Cadastrar cliente','Comece um novo relacionamento'],['sales','↗','Registrar venda','Um novo olhar, uma nova venda'],['entries','⇄','Lançar movimentação','Mantenha o financeiro em dia']].filter(([k])=>allowedPage(k));
  return `<div class="welcome"><div><small>SEU NEGÓCIO, EM FOCO</small><h2>Bem-vindo à Siciliano.</h2><p>Seus clientes, suas vendas e os próximos reencontros.</p></div><div class="glasses" aria-hidden="true">◯—◯</div></div>
  <div class="stats dashboard-stats">${stat('Total de clientes',d.clientCount.toLocaleString('pt-BR'),'Clientes cadastrados na ótica','♙')}${stat('Vendas em '+today.slice(0,4),money(d.thisYear.cents/100),d.thisYear.count.toLocaleString('pt-BR')+' vendas no ano','↗')}${stat('Total de vendas',money(d.total),db.sales.length.toLocaleString('pt-BR')+' vendas em todo o histórico','✓')}${stat('1 ano da última compra',d.anniversaries.length.toLocaleString('pt-BR'),'Clientes no mês selecionado abaixo','◷')}</div>
@@ -50,5 +77,5 @@ function dashboardView(){
  <section class="panel"><div class="panel-head"><div><h2>Vendas por dia</h2><p>Últimos 7 dias, incluindo hoje</p></div><span class="badge">${d.days.reduce((n,x)=>n+x.count,0)} vendas</span></div><div class="chart daily-chart" aria-hidden="true">${d.days.map(x=>`<div class="bar-group" title="${fmt(x.date)}: ${x.count} vendas, ${money(x.cents/100)}"><div class="bar" style="height:${x.cents/max*100}%;min-height:${x.cents?2:0}px"></div></div>`).join('')}</div><div class="chart-labels" aria-hidden="true">${d.days.map(x=>`<span>${fmt(x.date).slice(0,5)}</span>`).join('')}</div><details class="daily-data"><summary>Consultar valores por dia</summary>${table(['DATA','VENDAS','TOTAL'],d.days.map(x=>`<tr><td>${fmt(x.date)}</td><td>${x.count}</td><td>${money(x.cents/100)}</td></tr>`))}</details><p class="note">Total nos 7 dias: <b>${money(d.days.reduce((n,x)=>n+x.cents,0)/100)}</b></p></section></div>
  <section class="panel"><div class="panel-head"><div><h2>Últimas vendas</h2><p>As 10 vendas mais recentes pela data do atendimento</p></div><a href="#sales" class="text-btn">Ver todas as vendas →</a></div>${table(['CLIENTE','PRODUTO','DATA','VALOR','SITUAÇÃO','PAGAMENTO'],saleRows(d.latest))}</section>
  <section class="panel"><div class="panel-head"><div><h2>Atalhos do dia a dia</h2><p>Comece um atendimento ou registre uma movimentação</p></div></div><div class="quick dashboard-quick">${quick.map(([k,i,t,s])=>`<button data-new="${k}"><span class="qicon">${i}</span><span><b>${t}</b><small>${s}</small></span><span class="arrow">↗</span></button>`).join('')}</div></section>
- <section class="panel"><div class="panel-head anniversary-head"><div><h2>Clientes completando 1 ano da última compra</h2><p>Calculado pela última venda registrada no histórico disponível. Em 29/02, o aniversário é considerado em 28/02 no ano seguinte.</p></div><label>Mês de acompanhamento<input id="anniversary-month" type="month" value="${esc(month)}" required></label></div><p class="note">${d.anniversaries.length} cliente(s) completam exatamente um ano no mês selecionado. Use WhatsApp para abrir a mensagem personalizada, revisar e enviar.</p><div class="anniversary-list">${table(['CLIENTE','TELEFONE','ÚLTIMA COMPRA','COMPLETA 1 ANO','ACOMPANHAMENTO','CONTATO'],anniversaryRows)}</div></section>`;
+ <section class="panel"><div class="panel-head anniversary-head"><div><h2>Clientes completando 1 ano da última compra</h2><p>Calculado pela última venda registrada no histórico disponível. Em 29/02, o aniversário é considerado em 28/02 no ano seguinte.</p></div><label>Mês de acompanhamento<input id="anniversary-month" type="month" value="${esc(month)}" required></label></div><p class="note">${d.anniversaries.length} cliente(s) completam exatamente um ano no mês selecionado. Abra o WhatsApp, envie a mensagem e depois confirme em Marcar como enviada. Abrir a conversa não marca o envio automaticamente. Não enviada significa que ainda não há confirmação registrada neste controle. ${db.contactsReady?'As mensagens confirmadas ficam bloqueadas para evitar reenvio.':'O controle de mensagens está indisponível; atualize os dados ou contate o administrador.'}</p><div class="anniversary-list">${table(['CLIENTE','TELEFONE','ÚLTIMA COMPRA','COMPLETA 1 ANO','ACOMPANHAMENTO','MENSAGEM','CONTROLE DE ENVIO'],anniversaryRows)}</div></section>`;
 }
