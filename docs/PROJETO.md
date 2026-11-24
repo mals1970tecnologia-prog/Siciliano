@@ -424,3 +424,7 @@ Verificações: contact-messages-check.mjs (RLS, perfis, isolamento, duplicidade
 O acompanhamento de um ano da última compra foi movido da Visão geral para Clientes. Administrador e Gerencial alternam entre Clientes geral e Clientes com compra há um ano. O segundo segmento conserva a escolha de mês, pesquisa por nome/telefone/e-mail, confirmação manual de mensagem, data e responsável, consulta antes de abrir WhatsApp e bloqueio de reenvio confirmado. A exportação CSV respeita o segmento, mês e pesquisa e inclui o controle de envio. Equipe mantém o cadastro geral, respeitando o acesso anterior ao acompanhamento. A Visão geral conserva apenas o indicador do mês atual.
 
 Verificações aprovadas: client-segments-check.cjs, dashboard-check.cjs, contact-ui-check.cjs e landing-check.mjs. Prévia no navegador com dados fictícios confirmou navegação, duas opções e estados de mensagem na página Clientes.
+
+### Lista de acompanhamento responsiva — 24/11/2026
+
+O acompanhamento de um ano adapta a tabela ao espaço do painel: abaixo de 1100px, cada linha vira um cartão com rótulos, nome em destaque e ações em área própria. Abaixo de 540px, os campos ficam em duas colunas. Telefones e datas permanecem inteiros. A rolagem interna limitada foi removida; em painéis largos a tabela permanece. Cabeçalho flexível, texto e botões maiores. Regras, segmentação, exportação e controle de mensagens preservados. Testes de segmentação e confirmação aprovados; prévia visual com dados fictícios confirmou ações legíveis.
