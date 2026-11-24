@@ -1,0 +1,12 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+let admin=true;const db={clients:[{id:'a',name:'ANA',phone:'11999999999'},{id:'b',name:'BIA',phone:'11988887777'}],sales:[{id:'s',client:'a',date:'2025-11-24',value:10}],contacts:[],contactsReady:true,users:[]};
+const c=vm.createContext({Date,Intl,Map,Number,String,Math,db,query:'',fullAccess:()=>admin,allowedPage:()=>true,esc:x=>String(x||''),person:x=>x,fmt:x=>x,money:x=>x,toolbar:()=>'<input id="search"><button id="export">Exportar</button>',table:(h,r)=>h.join('|')+r.join(''),stat:()=>'',saleRows:()=>[]});
+vm.runInContext(fs.readFileSync('dist/dashboard.js','utf8'),c);
+vm.runInContext("dashboardMonth='2026-11';",c);
+let h=vm.runInContext('clientsView()',c);assert(h.includes('Editar'));assert(!h.includes('id="anniversary-month"'));
+vm.runInContext("clientSegment='anniversary'",c);h=vm.runInContext('clientsView()',c);assert(h.includes('ANA'));assert(!h.includes('BIA'));assert(h.includes('data-anniversary-sent'));assert(h.includes('id="export"'));
+c.query='bia';assert.equal(vm.runInContext('clientAnniversaries().length',c),0);c.query='';
+vm.runInContext("dashboardMonth='2026-12'",c);assert.equal(vm.runInContext('clientAnniversaries().length',c),0);
+assert(!vm.runInContext('dashboardView()',c).includes('id="anniversary-month"'));
+admin=false;h=vm.runInContext('clientsView()',c);assert(!h.includes('data-client-segment="anniversary"'));assert(h.includes('BIA'));
+console.log('OK: segmentação, pesquisa, mês, controle de envio, exportação visível, remoção do painel inicial e perfis.');

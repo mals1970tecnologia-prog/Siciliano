@@ -418,3 +418,9 @@ Na Visão geral, cada cliente completando um ano da última compra mostra Não e
 Aplicar contact-messages.sql após as migrações de base e perfis. A tabela usa RLS, vínculo com loja e cliente, data da última compra validada e chave única por acompanhamento. O servidor define responsável e horário; não há atualização ou exclusão pelo navegador. Falha ao consultar o controle bloqueia a abertura até atualizar os dados. Antes de abrir, o estado é consultado novamente. Aberturas simultâneas anteriores à confirmação não equivalem a uma reserva de envio.
 
 Verificações: contact-messages-check.mjs (RLS, perfis, isolamento, duplicidade e nova compra), contact-ui-check.cjs (abertura, confirmação, cancelamento e falha segura), cloud-check.mjs e regressões de painel e página inicial aprovadas. Prévia visual usa somente dados fictícios locais.
+
+### Segmentação na página Clientes — 24/11/2026
+
+O acompanhamento de um ano da última compra foi movido da Visão geral para Clientes. Administrador e Gerencial alternam entre Clientes geral e Clientes com compra há um ano. O segundo segmento conserva a escolha de mês, pesquisa por nome/telefone/e-mail, confirmação manual de mensagem, data e responsável, consulta antes de abrir WhatsApp e bloqueio de reenvio confirmado. A exportação CSV respeita o segmento, mês e pesquisa e inclui o controle de envio. Equipe mantém o cadastro geral, respeitando o acesso anterior ao acompanhamento. A Visão geral conserva apenas o indicador do mês atual.
+
+Verificações aprovadas: client-segments-check.cjs, dashboard-check.cjs, contact-ui-check.cjs e landing-check.mjs. Prévia no navegador com dados fictícios confirmou navegação, duas opções e estados de mensagem na página Clientes.
