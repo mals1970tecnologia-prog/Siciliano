@@ -47,3 +47,7 @@ Vendas pagas são computadas diretamente nos relatórios e não devem ser duplic
 Para repetir, obter o pacote oficial `@electric-sql/pglite@0.5.16` do npm e extrair em `verification/package`; rodar `node supabase/verification/check.mjs` a partir da pasta do aplicativo. Dependência baixada apenas para teste, ignorada pelo Git.
 
 Referências oficiais: https://supabase.com/docs/guides/database/postgres/row-level-security e https://supabase.com/docs/guides/database/functions
+
+## Estoque informativo (25/11/2026)
+
+Após os scripts de base, perfis e detalhes de vendas, aplique stock-optional.sql. Esta regra substitui a baixa automática e a exigência de saldo nas vendas: produto ativo pode ser vendido sem saldo e o estoque permanece intacto. O campo e os ajustes manuais continuam disponíveis. Venda, itens e detalhes mantêm gravação atômica e idempotência.

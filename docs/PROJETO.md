@@ -436,3 +436,9 @@ O acompanhamento reserva uma nova aba about:blank durante o clique, confere o en
 Retorno de visibilidade e eventos de autenticação do mesmo usuário verificam usuário e vínculo em segundo plano, sem ocultar a aplicação nem recarregar dados quando o perfil não mudou. Preserva página, filtros e diálogos. Falhas temporárias de rede mostram aviso na aplicação. Sessão ausente, usuário inválido, troca de usuário ou acesso revogado continuam bloqueando o acesso. Persistência de sessão e renovação automática estão explícitas no cliente Supabase. Login inicial e logout mantêm validação.
 
 Testes aprovados: session-return-check.cjs cobre retorno, rede temporária, revogação, saída e troca de usuário; contact-ui-check.cjs confirma nova aba separada sem marcar envio; landing-check.mjs e client-segments-check.cjs sem regressões. Nenhuma mensagem real enviada nos testes.
+
+### Estoque informativo nas vendas — 25/11/2026
+
+Aplicado no Supabase stock-optional.sql (sales_without_stock_requirement). A função optical_create_sale permite produto ativo com saldo zero ou quantidade superior ao saldo, sem baixar estoque nem gerar movimento de estoque. optical_create_sale_complete delega à mesma regra. Campo e ajustes manuais permanecem disponíveis. Não altera saldos ou movimentos anteriores. Mantém restrições de produto ativo, loja, cliente, perfil, valores, quantidades, atomicidade e idempotência.
+
+sales-check.mjs: 32 verificações aprovadas, incluindo saldo zero/quantidade 50, saldo preservado, ausência de movimento e produto inativo rejeitado. Verificação no banco hospedado executou uma venda completa em transação revertida com ROLLBACK; nenhuma venda de teste foi persistida. Mudança já ativa no banco, sem necessidade de nova versão visual do site.
