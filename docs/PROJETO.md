@@ -450,3 +450,7 @@ A página Vendas ordena por data da venda decrescente e, no mesmo dia, pelo time
 Filtros combináveis: todo histórico, dia ou mês, texto de cliente e texto de produto (incluindo itens múltiplos e nomes históricos). Mantém situação e pesquisa geral. Limpar filtros restaura a lista completa. Voltar da outra aba e atualizar dados mantém filtros em andamento; navegação para outra página reinicia-os. Os filtros específicos de Vendas não interferem nos relatórios.
 
 sales-list-check.cjs aprovado: ordenação, timestamps com fusos, histórico importado, falta de hora, dia/mês, cliente/produto e múltiplos itens. Regressões de navegação, dashboard, sessão e segmentação aprovadas. Prévia visual fictícia confirmou pesquisa por cliente e lista filtrada.
+
+### Tela de vendas responsiva — 25/11/2026
+
+Em painéis abaixo de 1100px, cada venda é apresentada como cartão com rótulos para cliente, produto, data/cadastro, valor, situação e pagamento/ações. Abaixo de 540px os campos e filtros passam a uma coluna. Evita cortes de pagamento e Detalhes, mantendo tabela em painéis largos. Textos e ações ganharam tamanho legível. Filtros, ordenação e exportação preservados; sales-list-check.cjs e landing-check.mjs aprovados. Prévia fictícia confirmou pagamento e botão Detalhes visíveis.
