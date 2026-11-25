@@ -1,0 +1,11 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');const c=vm.createContext({Date,Intl,Map,Set,Number,String,Math,Object,window:{sicilianoCloud:{role:'admin'}},document:{querySelector(){}}});const app=fs.readFileSync('dist/app.js','utf8');vm.runInContext(app.slice(0,app.indexOf('function stat(')),c);
+const fixture={clients:[{id:'a',name:'ANA'},{id:'b',name:'BIA'}],products:[{id:'p',name:'ARMAÇÃO AZUL'}],sales:[{id:'old-import',client:'a',date:'2020-01-01',created_at:'2026-11-25T23:00:00Z',product:'p'},{id:'early',client:'a',date:'2026-11-25',created_at:'2026-11-25T09:00:00-03:00',product:'p'},{id:'late',client:'b',date:'2026-11-25',created_at:'2026-11-25T13:00:00Z',productLabel:'ARMAÇÃO + LENTE',items:[{product_name:'LENTE MULTIFOCAL'}]},{id:'missing',client:'a',date:'2026-11-25',product:'p'},{id:'yesterday',client:'b',date:'2026-11-24',created_at:'2026-11-25T22:00:00Z',product:'p'}]};c.fixture=fixture;vm.runInContext("db=fixture;page='sales'",c);
+const ids=()=>Array.from(vm.runInContext('filteredSales().map(s=>s.id)',c));assert.deepEqual(ids(),['late','early','missing','yesterday','old-import']);assert.equal(fixture.sales[0].id,'old-import');
+vm.runInContext("Object.assign(saleFilters,{mode:'day',day:'2026-11-24'})",c);assert.deepEqual(ids(),['yesterday']);
+vm.runInContext("Object.assign(saleFilters,{mode:'month',month:'2026-11',client:'ana'})",c);assert.deepEqual(ids(),['early','missing']);
+vm.runInContext("Object.assign(saleFilters,{client:'bia',product:'multifocal'})",c);assert.deepEqual(ids(),['late']);
+vm.runInContext("saleFilters.month='2026-12'",c);assert.deepEqual(ids(),[]);
+vm.runInContext("page='reports'",c);assert.equal(ids().length,5);
+vm.runInContext("query='MULTIFOCAL'",c);assert.deepEqual(ids(),['late']);
+assert.match(vm.runInContext("saleRegistration(db.sales[1])",c),/09:00/);assert.equal(vm.runInContext("saleRegistration({})",c),'Horário não informado');
+console.log('OK: ordem por data e hora normalizada, histórico importado, ausência de hora, filtros combinados de dia/mês/cliente/produto, múltiplos itens e isolamento dos relatórios.');

@@ -442,3 +442,11 @@ Testes aprovados: session-return-check.cjs cobre retorno, rede temporária, revo
 Aplicado no Supabase stock-optional.sql (sales_without_stock_requirement). A função optical_create_sale permite produto ativo com saldo zero ou quantidade superior ao saldo, sem baixar estoque nem gerar movimento de estoque. optical_create_sale_complete delega à mesma regra. Campo e ajustes manuais permanecem disponíveis. Não altera saldos ou movimentos anteriores. Mantém restrições de produto ativo, loja, cliente, perfil, valores, quantidades, atomicidade e idempotência.
 
 sales-check.mjs: 32 verificações aprovadas, incluindo saldo zero/quantidade 50, saldo preservado, ausência de movimento e produto inativo rejeitado. Verificação no banco hospedado executou uma venda completa em transação revertida com ROLLBACK; nenhuma venda de teste foi persistida. Mudança já ativa no banco, sem necessidade de nova versão visual do site.
+
+### Ordem e filtros da relação de vendas — 25/11/2026
+
+A página Vendas ordena por data da venda decrescente e, no mesmo dia, pelo timestamp de cadastro decrescente, normalizado entre fusos; ID desempata e ausência de horário fica por último no dia. Exibe data da venda e cadastro em America/Sao_Paulo, com identificação clara: o banco não guarda um horário histórico separado do cadastro. A exportação usa a mesma seleção e ordem.
+
+Filtros combináveis: todo histórico, dia ou mês, texto de cliente e texto de produto (incluindo itens múltiplos e nomes históricos). Mantém situação e pesquisa geral. Limpar filtros restaura a lista completa. Voltar da outra aba e atualizar dados mantém filtros em andamento; navegação para outra página reinicia-os. Os filtros específicos de Vendas não interferem nos relatórios.
+
+sales-list-check.cjs aprovado: ordenação, timestamps com fusos, histórico importado, falta de hora, dia/mês, cliente/produto e múltiplos itens. Regressões de navegação, dashboard, sessão e segmentação aprovadas. Prévia visual fictícia confirmou pesquisa por cliente e lista filtrada.
