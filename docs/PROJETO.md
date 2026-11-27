@@ -454,3 +454,7 @@ sales-list-check.cjs aprovado: ordenação, timestamps com fusos, histórico imp
 ### Tela de vendas responsiva — 25/11/2026
 
 Em painéis abaixo de 1100px, cada venda é apresentada como cartão com rótulos para cliente, produto, data/cadastro, valor, situação e pagamento/ações. Abaixo de 540px os campos e filtros passam a uma coluna. Evita cortes de pagamento e Detalhes, mantendo tabela em painéis largos. Textos e ações ganharam tamanho legível. Filtros, ordenação e exportação preservados; sales-list-check.cjs e landing-check.mjs aprovados. Prévia fictícia confirmou pagamento e botão Detalhes visíveis.
+
+### Dez vendas mais recentes na tela — 27/11/2026
+
+A página Vendas mostra no máximo dez registros após aplicar filtros e ordem decrescente por data/cadastro. A indicação Exibindo X de Y informa o recorte. Sem filtro de data substitui o rótulo Todo o histórico, sem alterar a busca. Dia, mês, cliente, produto, situação e pesquisa permanecem disponíveis. O histórico não foi excluído e o CSV mantém todos os resultados dos filtros. sales-list-check.cjs verifica 25 registros, limite de dez, filtro antes do recorte, resultado único e vazio; navegação por perfil sem regressões.

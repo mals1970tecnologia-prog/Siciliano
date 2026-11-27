@@ -9,3 +9,12 @@ vm.runInContext("page='reports'",c);assert.equal(ids().length,5);
 vm.runInContext("query='MULTIFOCAL'",c);assert.deepEqual(ids(),['late']);
 assert.match(vm.runInContext("saleRegistration(db.sales[1])",c),/09:00/);assert.equal(vm.runInContext("saleRegistration({})",c),'Horário não informado');
 console.log('OK: ordem por data e hora normalizada, histórico importado, ausência de hora, filtros combinados de dia/mês/cliente/produto, múltiplos itens e isolamento dos relatórios.');
+
+vm.runInContext("page='sales';query='';Object.assign(saleFilters,{mode:'all',day:'',month:'',client:'',product:''});",c);
+fixture.sales=Array.from({length:25},(_,i)=>({id:String(i),client:i<12?'a':'b',date:'2026-11-'+String(i+1).padStart(2,'0'),created_at:'2026-11-25T12:00:00Z',product:'p'}));
+assert.equal(vm.runInContext('visibleSales().length',c),10);assert.equal(vm.runInContext('filteredSales().length',c),25);
+assert.equal(vm.runInContext('visibleSales()[0].id',c),'24');assert.equal(vm.runInContext('visibleSales()[9].id',c),'15');
+vm.runInContext("saleFilters.client='ana'",c);assert.equal(vm.runInContext('visibleSales().length',c),10);assert.equal(vm.runInContext('visibleSales()[0].id',c),'11');
+vm.runInContext("saleFilters.mode='day';saleFilters.day='2026-11-01'",c);assert.equal(vm.runInContext('visibleSales().length',c),1);
+vm.runInContext("saleFilters.day='2026-12-01'",c);assert.equal(vm.runInContext('visibleSales().length',c),0);
+console.log('OK: limite de 10 após ordenação e filtros, histórico completo para exportação, um resultado e lista vazia.');
